@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Family Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <!-- Firebase Configuration -->
+    <script>
+        // Firebase Configuration - This will be public but that's okay for client-side apps
+        const firebaseConfig = {
+            apiKey: "AIzaSyAzvQFIitxhT9G9LiDqFi9SL4VPYLMAtFA",
+            authDomain: "family-dashboard-84bea.firebaseapp.com",
+            projectId: "family-dashboard-84bea",
+            storageBucket: "family-dashboard-84bea.firebasestorage.app",
+            messagingSenderId: "360815365010",
+            appId: "1:360815365010:web:c656020b704c378c7d4f4b"
+        };
+        
+        // Make config available globally
+        window.firebaseConfig = firebaseConfig;
+    </script>
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+        // Initialize Firebase using config from external file
+        const app = initializeApp(window.firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Make Firebase available globally
+        window.db = db;
+        window.auth = auth;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.signOut = signOut;
+        
+        // Signal that Firebase is ready
+        window.firebaseReady = true;
+        
+        console.log('Firebase SDK loaded successfully');
+    </script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1 id="dashboard-title" onclick="editDashboardTitle()"><i class="fas fa-home"></i> <span id="dashboard-title-text">Family Dashboard</span></h1>
+                    <button class="btn btn-secondary" onclick="showInviteModal()" style="margin-left: 20px;">
+                        <i class="fas fa-user-plus"></i> + Invite Family
+                    </button>
+                </div>
+                <div class="header-actions">
+                    <div id="loading-indicator" style="display: none; color: #3b82f6; margin-right: 10px;">
+                        <i class="fas fa-spinner fa-spin"></i> Connecting...
+                    </div>
+                    <div id="firebase-status" style="display: none; color: #f59e0b; margin-right: 10px; cursor: pointer;" onclick="showFirebaseHelp()">
+                        <i class="fas fa-exclamation-triangle"></i> Local Mode
+                    </div>
+                </div>
+                <div id="user-welcome" style="display: none;" class="user-welcome">
+                    <span id="welcome-text">Welcome, User!</span>
+                    <div class="user-profile" onclick="toggleUserMenu()">
+                        <img id="user-photo" src="" alt="Profile" />
+                        <div id="user-menu" class="user-menu">
+                            <div class="menu-item" onclick="signOutUser()">
+                                <i class="fas fa-sign-out-alt"></i> Sign Out
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="dashboard-content">
+            <!-- Family Mission Section -->
+            <section class="dashboard-section" id="family-mission">
+                <div class="section-content">
+                    <div class="mission-container">
+                        <h1 class="mission-title" id="mission-title" onclick="editMission()">Our Family Mission</h1>
+                        <p class="mission-text" id="mission-text" onclick="editMission()">To build a legacy of financial freedom, meaningful relationships, and purposeful growth that empowers future generations to live their best lives.</p>
+                        <div class="mission-edit" id="mission-edit" style="display: none;">
+                            <input type="text" id="mission-title-input" class="mission-title-input" placeholder="Enter your family mission title">
+                            <textarea id="mission-text-input" class="mission-text-input" placeholder="Enter your family mission statement"></textarea>
+                            <div class="mission-edit-buttons">
+                                <button class="btn btn-primary" onclick="saveMission()">Save</button>
+                                <button class="btn btn-secondary" onclick="cancelMissionEdit()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Good News Section -->
+            <section class="dashboard-section" id="good-news">
+                <div class="section-content">
+                    <div class="good-news-container">
+                        <div class="good-news-header">
+                            <h2 class="good-news-title">
+                                <i class="fas fa-heart"></i> 
+                                Weekly Family Highlights
+                            </h2>
+                            <p class="good-news-subtitle">Reflect on and share the best moments from your week</p>
+                        </div>
+                        <div class="good-news-content">
+                            <div class="reflection-prompt">
+                                <h3>Weekly Reflection</h3>
+                                <p>Take 5 minutes to share your highlights</p>
+                                <div class="reflection-topics">
+                                    <span>• Personal wins</span>
+                                    <span>• Family moments</span>
+                                    <span>• Gratitude</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Net Worth Trackers Section -->
+            <section class="dashboard-section" id="net-worth-trackers">
+                <div class="section-header">
+                    <h2><i class="fas fa-coins"></i> Net Worth Trackers</h2>
+                    <button class="btn btn-secondary" onclick="toggleNetWorthEdit()">
+                        <i class="fas fa-edit"></i> Edit
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="net-worth-grid">
+                        <!-- Current Net Worth Block -->
+                        <div class="net-worth-block current-net-worth">
+                            <h3><i class="fas fa-dollar-sign"></i> Current Net Worth</h3>
+                            <div class="net-worth-total">
+                                <span class="total-amount" id="current-net-worth-total">$0</span>
+                            </div>
+                            
+                            <!-- Summary Details -->
+                            <div class="summary-details">
+                                <div class="summary-item">
+                                    <span class="summary-label">Investments:</span>
+                                    <span class="summary-amount" id="summary-investments">$0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Assets:</span>
+                                    <span class="summary-amount" id="summary-assets">$0</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="summary-label">Debts:</span>
+                                    <span class="summary-amount" id="summary-debts">$0</span>
+                                </div>
+                            </div>
+                            
+                            <!-- View Details Button -->
+                            <div class="view-details-section">
+                                <button class="btn btn-secondary" id="view-details-btn" onclick="toggleDetailsView()">
+                                    <i class="fas fa-eye"></i> View Details
+                                </button>
+                            </div>
+                            
+                            <!-- Details Section (hidden by default) -->
+                            <div class="details-section" id="details-section" style="display: none;">
+                                <div class="net-worth-breakdown" id="current-breakdown">
+                                    <!-- Dynamic content will be loaded here -->
+                                </div>
+                                
+                                <!-- Monthly Investment Slider -->
+                                <div class="monthly-investment-section">
+                                    <h4><i class="fas fa-chart-line"></i> Monthly Investment</h4>
+                                    <div class="slider-container">
+                                        <input type="range" id="monthly-investment-slider" min="0" max="10000" step="100" value="0" onchange="updateMonthlyInvestment()">
+                                        <div class="slider-labels">
+                                            <span>$0</span>
+                                            <span id="monthly-investment-value">$0</span>
+                                            <span>$10,000</span>
+                                        </div>
+                                    </div>
+                                    <p class="slider-description">This monthly amount will be added to your investments and grow at 10% annually until age 60.</p>
+                                </div>
+                                
+                                <div class="add-item-buttons" id="current-add-buttons" style="display: none;">
+                                    <button class="btn btn-secondary" onclick="addInvestmentLine()">
+                                        <i class="fas fa-plus"></i> Add Investment
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="addAssetLine()">
+                                        <i class="fas fa-plus"></i> Add Asset
+                                    </button>
+                                    <button class="btn btn-secondary" onclick="addDebtLine()">
+                                        <i class="fas fa-plus"></i> Add Debt
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Future Net Worth Block -->
+                        <div class="net-worth-block future-net-worth">
+                            <h3><i class="fas fa-rocket"></i> Future Net Worth (Age 60)</h3>
+                            <div class="net-worth-total">
+                                <span class="total-amount" id="future-net-worth-total">$0</span>
+                            </div>
+                            <div class="net-worth-breakdown">
+                                <div class="breakdown-item">
+                                    <label>Annual Return Rate:</label>
+                                    <div class="return-rate-input">
+                                        <input type="number" id="annual-return-rate" value="10" min="0" max="20" step="0.1" onchange="updateReturnRate()">
+                                        <span class="percent-symbol">%</span>
+                                    </div>
+                                </div>
+                                <div class="breakdown-item">
+                                    <label>Current Net Worth Growth:</label>
+                                    <span class="calculated-amount" id="future-current-net-worth">$0</span>
+                                </div>
+                                <div class="breakdown-item">
+                                    <label>Monthly Investment Growth:</label>
+                                    <span class="calculated-amount" id="future-monthly-investments">$0</span>
+                                </div>
+                                <div class="breakdown-item">
+                                    <label>Birthday:</label>
+                                    <input type="date" id="birthday-input" value="1991-03-23" onchange="updateRetirementCalculations()">
+                                </div>
+                                <div class="breakdown-item">
+                                    <label>Retirement Age:</label>
+                                    <input type="number" id="retirement-age-input" value="60" min="40" max="80" onchange="updateRetirementCalculations()">
+                                </div>
+                                <div class="breakdown-item">
+                                    <label>Years to Retirement:</label>
+                                    <span class="calculated-amount" id="years-to-retirement">26 years</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- KPIs Section -->
+            <section class="dashboard-section" id="kpis">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-line"></i> KPIs</h2>
+                    <button class="btn btn-secondary" onclick="refreshKPIs()">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="kpi-container">
+                        <iframe 
+                            id="kpi-sheet"
+                            src="https://docs.google.com/spreadsheets/d/17ur_HZP2rich0E5xCDXC7bvh5IcAzOhr5UfjZsVLf_Q/edit?usp=sharing"
+                            width="100%" 
+                            height="600"
+                            frameborder="0"
+                            style="display: block;"
+                            allow="fullscreen"
+                            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+                            loading="lazy">
+                        </iframe>
+                        <div class="kpi-placeholder" id="kpi-placeholder" style="display: none;">
+                            <i class="fas fa-chart-bar"></i>
+                            <p>Embed your Google Sheet here</p>
+                            <button class="btn btn-primary" onclick="configureKPIs()">Configure KPIs</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Monthly Sprints Section -->
+            <section class="dashboard-section" id="monthly-sprints">
+                <div class="section-header">
+                    <h2><i class="fas fa-running"></i> Monthly Sprints</h2>
+                    <button class="btn btn-secondary" onclick="addSprint()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="sprint-list" id="sprint-list">
+                        <!-- Sprint items will be added here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- To Dos Section -->
+            <section class="dashboard-section" id="todos">
+                <div class="section-header">
+                    <h2><i class="fas fa-tasks"></i> To Dos</h2>
+                    <button class="btn btn-secondary" onclick="addTodo()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="todo-list" id="todo-list">
+                        <!-- Todo items will be added here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Annual Goals Section -->
+            <section class="dashboard-section" id="annual-goals">
+                <div class="section-header">
+                    <h2><i class="fas fa-bullseye"></i> Annual Goals</h2>
+                    <div class="section-actions">
+                        <button class="btn btn-secondary" id="show-completed-btn" onclick="toggleCompletedGoals()">
+                            <i class="fas fa-eye"></i> Show Completed (<span id="completed-count">0</span>)
+                        </button>
+                        <button class="btn btn-secondary" onclick="addGoal()">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="section-content">
+                    <div class="goals-list" id="goals-list">
+                        <!-- Goal items will be added here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Meeting Discussions Section -->
+            <section class="dashboard-section" id="meeting-discussions">
+                <div class="section-header">
+                    <h2><i class="fas fa-comments"></i> Meeting Discussions</h2>
+                    <button class="btn btn-secondary" onclick="addDiscussion()">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="section-content">
+                    <div class="discussions-list" id="discussions-list">
+                        <!-- Discussion items will be added here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Invite Family Member Modal -->
+    <div id="invite-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-user-plus"></i> Invite Family Member</h2>
+                <span class="close" onclick="closeInviteModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="invite-email">Email Address:</label>
+                    <input type="email" id="invite-email" placeholder="Enter family member's email">
+                </div>
+                <div class="form-group">
+                    <label for="invite-name">Name (Optional):</label>
+                    <input type="text" id="invite-name" placeholder="Enter family member's name">
+                </div>
+                <div class="form-group">
+                    <label for="invite-role">Role:</label>
+                    <select id="invite-role">
+                        <option value="member">Family Member</option>
+                        <option value="admin">Admin (Full Access)</option>
+                    </select>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-primary" onclick="sendInvite()">
+                        <i class="fas fa-paper-plane"></i> Send Invite
+                    </button>
+                    <button class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding new items -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Add New Item</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="modal-form">
+                    <div class="form-group">
+                        <label for="item-title">Title</label>
+                        <input type="text" id="item-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-description">Description</label>
+                        <textarea id="item-description" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-priority">Priority</label>
+                        <select id="item-priority">
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="item-deadline">Deadline</label>
+                        <input type="date" id="item-deadline">
+                    </div>
+                    <div class="form-group">
+                        <label for="item-assignee">Assignee</label>
+                        <select id="item-assignee">
+                            <option value="both">Both</option>
+                            <option value="wife">Wife</option>
+                            <option value="husband">Husband</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="saveItem()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
