@@ -2415,3 +2415,74 @@ input[type="range"]::-moz-range-thumb:hover {
     border-color: #667eea;
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
+
+/* Admin Panel Styles */
+.admin-section {
+    margin-bottom: 20px;
+}
+
+.admin-section h3 {
+    margin-bottom: 15px;
+    color: #374151;
+    font-size: 1.1em;
+}
+
+.family-member-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background-color: #f9fafb;
+}
+
+.member-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.member-role {
+    font-size: 0.9em;
+    color: #6b7280;
+    background-color: #e5e7eb;
+    padding: 2px 8px;
+    border-radius: 12px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.btn-small {
+    padding: 5px 10px;
+    font-size: 0.8em;
+}
+
+.btn-danger {
+    background-color: #ef4444;
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #dc2626;
+}
+
+#admin-email,
+#admin-name,
+#admin-role {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+#admin-email:focus,
+#admin-name:focus,
+#admin-role:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}

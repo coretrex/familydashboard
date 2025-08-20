@@ -69,8 +69,8 @@
             <div class="header-content">
                 <div class="header-left">
                     <h1 id="dashboard-title" onclick="editDashboardTitle()"><i class="fas fa-home"></i> <span id="dashboard-title-text">Family Dashboard</span></h1>
-                    <button class="btn btn-secondary" onclick="showInviteModal()" style="margin-left: 20px;">
-                        <i class="fas fa-user-plus"></i> + Invite Family
+                    <button class="btn btn-secondary" onclick="showAdminPanel()" style="margin-left: 20px;">
+                        <i class="fas fa-users-cog"></i> Admin Panel
                     </button>
                 </div>
                 <div class="header-actions">
@@ -80,6 +80,7 @@
                     <div id="firebase-status" style="display: none; color: #f59e0b; margin-right: 10px; cursor: pointer;" onclick="showFirebaseHelp()">
                         <i class="fas fa-exclamation-triangle"></i> Local Mode
                     </div>
+
                 </div>
                 <div id="user-welcome" style="display: none;" class="user-welcome">
                     <span id="welcome-text">Welcome, User!</span>
@@ -352,34 +353,56 @@
         </main>
     </div>
 
-    <!-- Invite Family Member Modal -->
-    <div id="invite-modal" class="modal">
+    <!-- Admin Panel Modal -->
+    <div id="admin-modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2><i class="fas fa-user-plus"></i> Invite Family Member</h2>
-                <span class="close" onclick="closeInviteModal()">&times;</span>
+                <h2><i class="fas fa-users-cog"></i> Admin Panel</h2>
+                <span class="close" onclick="closeAdminPanel()">&times;</span>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="invite-email">Email Address:</label>
-                    <input type="email" id="invite-email" placeholder="Enter family member's email">
-                </div>
-                <div class="form-group">
-                    <label for="invite-name">Name (Optional):</label>
-                    <input type="text" id="invite-name" placeholder="Enter family member's name">
-                </div>
-                <div class="form-group">
-                    <label for="invite-role">Role:</label>
-                    <select id="invite-role">
-                        <option value="member">Family Member</option>
-                        <option value="admin">Admin (Full Access)</option>
-                    </select>
-                </div>
-                <div class="modal-actions">
-                    <button class="btn btn-primary" onclick="sendInvite()">
-                        <i class="fas fa-paper-plane"></i> Send Invite
+                <div class="admin-section">
+                    <h3><i class="fas fa-user-plus"></i> Add Family Member</h3>
+                    <div class="form-group">
+                        <label for="admin-email">Email Address:</label>
+                        <input type="email" id="admin-email" placeholder="Enter family member's email">
+                    </div>
+                    <div class="form-group">
+                        <label for="admin-name">Name:</label>
+                        <input type="text" id="admin-name" placeholder="Enter family member's name">
+                    </div>
+                    <div class="form-group">
+                        <label for="admin-role">Role:</label>
+                        <select id="admin-role">
+                            <option value="member">Family Member</option>
+                            <option value="admin">Admin (Full Access)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-primary" onclick="addFamilyMember()">
+                        <i class="fas fa-plus"></i> Add Member
                     </button>
-                    <button class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
+                </div>
+                
+                <hr style="margin: 30px 0;">
+                
+                <div class="admin-section">
+                    <h3><i class="fas fa-users"></i> Current Family Members</h3>
+                    <div id="family-members-list">
+                        <!-- Family members will be listed here -->
+                    </div>
+                </div>
+                
+                <hr style="margin: 30px 0;">
+                
+                <div class="admin-section">
+                    <h3><i class="fas fa-tools"></i> Data Management</h3>
+                    <button class="btn btn-secondary" onclick="reloadNetWorthData()">
+                        <i class="fas fa-sync-alt"></i> Reload Net Worth Data
+                    </button>
+                </div>
+                
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeAdminPanel()">Close</button>
                 </div>
             </div>
         </div>
