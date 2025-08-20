@@ -43,16 +43,30 @@ window.saveMission = async function() {
         text: textElement.textContent
     };
     
-    // Save to localStorage
-    localStorage.setItem('familyMission', JSON.stringify(missionData));
+    // Try to save to Firebase first if user is authenticated and dashboard is initialized
+    let firebaseSuccess = false;
+    console.log('Dashboard state:', {
+        exists: !!dashboard,
+        userId: dashboard?.userId,
+        initialized: dashboard?.initialized
+    });
     
-    // Save to Firebase if user is authenticated
     try {
-        if (dashboard && dashboard.userId) {
+        if (dashboard && dashboard.userId && dashboard.initialized) {
             await dashboard.saveMissionData(missionData);
+            firebaseSuccess = true;
+            console.log('Mission saved to Firebase successfully');
+        } else {
+            console.log('Firebase not available - dashboard not ready or user not authenticated');
         }
     } catch (error) {
         console.error('Error saving mission to Firebase:', error);
+    }
+    
+    // Only save to localStorage if Firebase failed or user is not authenticated
+    if (!firebaseSuccess) {
+        localStorage.setItem('familyMission', JSON.stringify(missionData));
+        console.log('Mission saved to localStorage (Firebase not available)');
     }
 };
 
@@ -71,10 +85,13 @@ window.cancelMissionEdit = function() {
 window.loadMission = async function() {
     let missionData = null;
     
-    // Try to load from Firebase first if user is authenticated
+    // Try to load from Firebase first if user is authenticated and dashboard is initialized
     try {
-        if (dashboard && dashboard.userId) {
+        if (dashboard && dashboard.userId && dashboard.initialized) {
             missionData = await dashboard.loadMissionData();
+            if (missionData) {
+                console.log('Mission loaded from Firebase successfully');
+            }
         }
     } catch (error) {
         console.error('Error loading mission from Firebase:', error);
@@ -85,6 +102,7 @@ window.loadMission = async function() {
         const saved = localStorage.getItem('familyMission');
         if (saved) {
             missionData = JSON.parse(saved);
+            console.log('Mission loaded from localStorage (Firebase not available)');
         }
     }
     
@@ -799,6 +817,9 @@ class DashboardData {
         Object.keys(this.data).forEach(type => {
             this.setupCollectionListener(type);
         });
+        
+        // Set up real-time listener for mission data
+        this.setupMissionListener();
     }
 
     async setupCollectionListener(type) {
@@ -815,6 +836,33 @@ class DashboardData {
             });
         } catch (error) {
             console.error(`Error setting up listener for ${type}:`, error);
+        }
+    }
+
+    async setupMissionListener() {
+        try {
+            const { collection, doc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            // Listen to mission data using family ID (first user's ID)
+            const familyId = this.userId; // For now, use the first user's ID as family ID
+            const docRef = doc(collection(db, 'mission'), familyId);
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const missionData = docSnap.data();
+                    console.log('Mission data updated from Firestore for family:', familyId, missionData);
+                    
+                    // Update the UI with the new mission data
+                    const titleElement = document.getElementById('mission-title');
+                    const textElement = document.getElementById('mission-text');
+                    
+                    if (titleElement && textElement) {
+                        titleElement.textContent = missionData.title || 'Our Family Mission';
+                        textElement.textContent = missionData.text || 'To build a legacy of financial freedom, meaningful relationships, and purposeful growth that empowers future generations to live their best lives.';
+                    }
+                }
+            });
+        } catch (error) {
+            console.error('Error setting up mission listener:', error);
         }
     }
 
@@ -1038,14 +1086,17 @@ class DashboardData {
         try {
             const { collection, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            // Save mission data to Firestore
-            await setDoc(doc(collection(db, 'mission'), this.userId), {
+            // Save mission data to Firestore using family ID (first user's ID)
+            // This ensures all family members share the same mission
+            const familyId = this.userId; // For now, use the first user's ID as family ID
+            await setDoc(doc(collection(db, 'mission'), familyId), {
                 ...data,
-                userId: this.userId,
+                familyId: familyId,
+                updatedBy: this.userId,
                 updatedAt: new Date().toISOString()
             });
             
-            console.log('Mission data saved to Firestore');
+            console.log('Mission data saved to Firestore for family:', familyId);
         } catch (error) {
             console.error('Error saving mission data to Firestore:', error);
             throw error;
@@ -1060,14 +1111,16 @@ class DashboardData {
         try {
             const { collection, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            const docRef = doc(collection(db, 'mission'), this.userId);
+            // Load mission data using family ID (first user's ID)
+            const familyId = this.userId; // For now, use the first user's ID as family ID
+            const docRef = doc(collection(db, 'mission'), familyId);
             const docSnap = await getDoc(docRef);
             
             if (docSnap.exists()) {
-                console.log('Mission data loaded from Firestore');
+                console.log('Mission data loaded from Firestore for family:', familyId);
                 return docSnap.data();
             } else {
-                console.log('No mission data found in Firestore');
+                console.log('No mission data found in Firestore for family:', familyId);
                 return null;
             }
         } catch (error) {
