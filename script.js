@@ -2317,12 +2317,24 @@ window.editSprintTitle = function(id) {
     const titleElement = document.querySelector(`[data-id="${id}"] .sprint-title`);
     const currentTitle = item.title;
     
-    titleElement.innerHTML = `<input type="text" value="${escapeHtml(currentTitle)}" style="width: 100%; padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 1rem;" onblur="saveSprintTitle('${id}', this.value)" onkeypress="if(event.key==='Enter') this.blur()">`;
-    titleElement.querySelector('input').focus();
+    titleElement.innerHTML = `<input type="text" value="${escapeHtml(currentTitle)}" style="width: 100%; padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 1rem;" onblur="setTimeout(() => saveSprintTitle('${id}', this.value), 150)" onkeypress="if(event.key==='Enter') this.blur()">`;
+    
+    const input = titleElement.querySelector('input');
+    input.focus();
+    
+    // Prevent the input from losing focus when clicking inside it
+    input.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Prevent the parent from capturing clicks
+    titleElement.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
 };
 
 window.saveSprintTitle = async function(id, newTitle) {
-    if (!newTitle.trim()) return;
+    if (!newTitle || !newTitle.trim()) return;
     
     try {
         await dashboard.updateItem('sprints', id, { title: newTitle.trim() });
@@ -2349,8 +2361,20 @@ window.editSprintAssignee = function(id) {
         });
     }
     
-    assigneeElement.innerHTML = `<select style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.85rem;" onchange="saveSprintAssignee('${id}', this.value)">${options}</select>`;
-    assigneeElement.querySelector('select').focus();
+    assigneeElement.innerHTML = `<select style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.85rem;" onchange="saveSprintAssignee('${id}', this.value)" onblur="setTimeout(() => saveSprintAssignee('${id}', this.value), 150)">${options}</select>`;
+    
+    const select = assigneeElement.querySelector('select');
+    select.focus();
+    
+    // Prevent the select from losing focus when clicking inside it
+    select.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Prevent the parent from capturing clicks
+    assigneeElement.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
 };
 
 window.saveSprintAssignee = async function(id, newAssignee) {
@@ -2370,11 +2394,25 @@ window.editSprintDate = function(id) {
     const dateElement = document.querySelector(`[data-id="${id}"] .sprint-date`);
     const currentDate = item.deadline || '';
     
-    dateElement.innerHTML = `<input type="date" value="${currentDate}" style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.8rem;" onblur="saveSprintDate('${id}', this.value)" onchange="saveSprintDate('${id}', this.value)">`;
-    dateElement.querySelector('input').focus();
+    dateElement.innerHTML = `<input type="date" value="${currentDate}" style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.8rem;" onchange="saveSprintDate('${id}', this.value)" onblur="setTimeout(() => saveSprintDate('${id}', this.value), 150)">`;
+    
+    const input = dateElement.querySelector('input');
+    input.focus();
+    
+    // Prevent the input from losing focus when clicking inside it
+    input.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
+    
+    // Prevent the parent from capturing clicks
+    dateElement.addEventListener('click', function(e) {
+        e.stopPropagation();
+    });
 };
 
 window.saveSprintDate = async function(id, newDate) {
+    if (!newDate) return;
+    
     try {
         await dashboard.updateItem('sprints', id, { deadline: newDate });
         renderSection('sprints');
