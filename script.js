@@ -233,9 +233,57 @@ window.sendInvite = async function() {
         
         await addDoc(collection(db, 'invitations'), invitation);
         
-        // Send email invitation (this would require a backend service)
-        // For now, we'll just show a success message
-        alert(`Invitation sent to ${email}! They will receive an email with instructions to join your family dashboard.`);
+        // Send email invitation using EmailJS (if configured) or provide manual sharing instructions
+        try {
+            // Check if EmailJS is properly configured
+            if (typeof emailjs !== 'undefined' && emailjs.init) {
+                const templateParams = {
+                    to_email: email,
+                    to_name: name || 'Family Member',
+                    from_name: auth.currentUser.displayName || auth.currentUser.email,
+                    family_name: document.getElementById('dashboard-title-text').textContent || 'Family Dashboard',
+                    dashboard_url: window.location.href,
+                    invite_message: `You've been invited to join ${document.getElementById('dashboard-title-text').textContent || 'our family dashboard'}!`
+                };
+                
+                // Send email using EmailJS
+                await emailjs.send(
+                    'YOUR_EMAILJS_SERVICE_ID', // Replace with your EmailJS service ID
+                    'YOUR_EMAILJS_TEMPLATE_ID', // Replace with your EmailJS template ID
+                    templateParams
+                );
+                
+                alert(`Invitation sent to ${email}! They will receive an email with instructions to join your family dashboard.`);
+            } else {
+                // Fallback: Provide manual sharing instructions
+                const dashboardUrl = window.location.href;
+                const shareMessage = `You've been invited to join our family dashboard! Please visit: ${dashboardUrl}`;
+                
+                // Try to use browser's native sharing if available
+                if (navigator.share) {
+                    try {
+                        await navigator.share({
+                            title: 'Family Dashboard Invitation',
+                            text: shareMessage,
+                            url: dashboardUrl
+                        });
+                        alert(`Invitation shared with ${email}! Please send them the dashboard link manually.`);
+                    } catch (shareError) {
+                        // Fallback to clipboard copy
+                        await navigateToManualSharing(email, shareMessage, dashboardUrl);
+                    }
+                } else {
+                    // Fallback to clipboard copy
+                    await navigateToManualSharing(email, shareMessage, dashboardUrl);
+                }
+            }
+        } catch (emailError) {
+            console.error('Error sending email:', emailError);
+            // Fallback to manual sharing
+            const dashboardUrl = window.location.href;
+            const shareMessage = `You've been invited to join our family dashboard! Please visit: ${dashboardUrl}`;
+            await navigateToManualSharing(email, shareMessage, dashboardUrl);
+        }
         
         closeInviteModal();
         
@@ -244,6 +292,45 @@ window.sendInvite = async function() {
         alert('Error sending invitation. Please try again.');
     }
 };
+
+// Helper function for manual sharing when email is not available
+async function navigateToManualSharing(email, shareMessage, dashboardUrl) {
+    try {
+        // Copy the share message to clipboard
+        await navigator.clipboard.writeText(shareMessage);
+        
+        // Show detailed instructions
+        const instructions = `
+Invitation saved for ${email}!
+
+To complete the invitation:
+1. The dashboard link has been copied to your clipboard
+2. Please send an email to ${email} with the following message:
+
+${shareMessage}
+
+3. Once they visit the link, they can sign in and join your family dashboard.
+
+Dashboard URL: ${dashboardUrl}
+        `;
+        
+        alert(instructions);
+        
+    } catch (clipboardError) {
+        // If clipboard fails, just show the URL
+        const fallbackMessage = `
+Invitation saved for ${email}!
+
+Please manually send them this dashboard link:
+${dashboardUrl}
+
+With this message:
+${shareMessage}
+        `;
+        
+        alert(fallbackMessage);
+    }
+}
 
 // Check if user is invited to this family
 window.checkUserInvitation = async function() {
@@ -286,13 +373,16 @@ window.checkUserInvitation = async function() {
 window.acceptInvitation = async function(invitationId) {
     try {
         // Import Firebase functions
-        const { doc, updateDoc, addDoc, collection } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        const { doc, updateDoc, addDoc, collection, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
         
         const invitationRef = doc(db, 'invitations', invitationId);
         await updateDoc(invitationRef, {
             status: 'accepted',
             acceptedAt: new Date().toISOString()
         });
+        
+        // Get the invitation data to find the correct family ID
+        const invitationData = (await getDoc(invitationRef)).data();
         
         // Add user to family members collection
         const familyMember = {
@@ -302,7 +392,7 @@ window.acceptInvitation = async function(invitationId) {
             photoURL: auth.currentUser.photoURL,
             role: 'member',
             joinedAt: new Date().toISOString(),
-            familyId: auth.currentUser.uid // This should be the family ID from invitation
+            familyId: invitationData.familyId // Use the family ID from the invitation
         };
         
         await addDoc(collection(db, 'familyMembers'), familyMember);
@@ -793,14 +883,62 @@ class DashboardData {
         }
     }
 
+    async migrateDataToFamilyId(familyId) {
+        // Only migrate if this user is the family creator (to avoid conflicts)
+        if (this.userId !== familyId) return;
+        
+        try {
+            const { collection, getDocs, query, where, updateDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            // Check each collection for items that don't have familyId
+            for (const type of Object.keys(this.data)) {
+                const q = query(collection(db, type), where('userId', '==', this.userId));
+                const querySnapshot = await getDocs(q);
+                
+                querySnapshot.forEach(async (docSnap) => {
+                    const data = docSnap.data();
+                    if (!data.familyId) {
+                        // Update the document to include familyId
+                        await updateDoc(doc(db, type, docSnap.id), {
+                            familyId: familyId
+                        });
+                        console.log(`Migrated ${type} item ${docSnap.id} to include familyId`);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error migrating data to family ID:', error);
+        }
+    }
+
     async loadData() {
         if (!this.userId) return;
         
         try {
             const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
+            // First, determine the family ID for this user
+            let familyId = this.userId; // Default to user's own ID
+            
+            // Check if user is a family member and get their family ID
+            const familyMembersRef = collection(db, 'familyMembers');
+            const familyQuery = query(familyMembersRef, where('uid', '==', this.userId));
+            const familySnapshot = await getDocs(familyQuery);
+            
+            if (!familySnapshot.empty) {
+                const familyMember = familySnapshot.docs[0].data();
+                familyId = familyMember.familyId || this.userId;
+            }
+            
+            // Store the family ID for use in other methods
+            this.familyId = familyId;
+            
+            // Migrate existing data to include family ID if needed
+            await this.migrateDataToFamilyId(familyId);
+            
             for (const type of Object.keys(this.data)) {
-                const q = query(collection(db, type), where('userId', '==', this.userId));
+                // Load data based on family ID, not just user ID
+                const q = query(collection(db, type), where('familyId', '==', familyId));
                 const querySnapshot = await getDocs(q);
                 this.data[type] = [];
                 querySnapshot.forEach((doc) => {
@@ -836,7 +974,9 @@ class DashboardData {
         try {
             const { collection, onSnapshot, query, where } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            const q = query(collection(db, type), where('userId', '==', this.userId));
+            // Use family ID for real-time updates
+            const familyId = this.familyId || this.userId;
+            const q = query(collection(db, type), where('familyId', '==', familyId));
             onSnapshot(q, (snapshot) => {
                 this.data[type] = [];
                 snapshot.forEach((doc) => {
@@ -853,8 +993,8 @@ class DashboardData {
         try {
             const { collection, doc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            // Listen to mission data using family ID (first user's ID)
-            const familyId = this.userId; // For now, use the first user's ID as family ID
+            // Listen to mission data using family ID
+            const familyId = this.familyId || this.userId; // Use family ID if available, otherwise user ID
             const docRef = doc(collection(db, 'mission'), familyId);
             onSnapshot(docRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -929,6 +1069,7 @@ class DashboardData {
             const { collection, addDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
             item.userId = this.userId;
+            item.familyId = this.familyId || this.userId; // Include family ID for sharing
             item.createdAt = new Date().toISOString();
             
             const docRef = await addDoc(collection(db, type), item);
@@ -1056,10 +1197,12 @@ class DashboardData {
         try {
             const { collection, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            // Save net worth data to Firestore
-            await setDoc(doc(collection(db, 'netWorth'), this.userId), {
+            // Save net worth data to Firestore using family ID
+            const familyId = this.familyId || this.userId;
+            await setDoc(doc(collection(db, 'netWorth'), familyId), {
                 ...data,
                 userId: this.userId,
+                familyId: familyId,
                 updatedAt: new Date().toISOString()
             });
             
@@ -1078,7 +1221,8 @@ class DashboardData {
         try {
             const { collection, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            const docRef = doc(collection(db, 'netWorth'), this.userId);
+            const familyId = this.familyId || this.userId;
+            const docRef = doc(collection(db, 'netWorth'), familyId);
             const docSnap = await getDoc(docRef);
             
             if (docSnap.exists()) {
@@ -1102,9 +1246,9 @@ class DashboardData {
         try {
             const { collection, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            // Save mission data to Firestore using family ID (first user's ID)
+            // Save mission data to Firestore using family ID
             // This ensures all family members share the same mission
-            const familyId = this.userId; // For now, use the first user's ID as family ID
+            const familyId = this.familyId || this.userId; // Use family ID if available, otherwise user ID
             await setDoc(doc(collection(db, 'mission'), familyId), {
                 ...data,
                 familyId: familyId,
@@ -1127,8 +1271,8 @@ class DashboardData {
         try {
             const { collection, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
             
-            // Load mission data using family ID (first user's ID)
-            const familyId = this.userId; // For now, use the first user's ID as family ID
+            // Load mission data using family ID
+            const familyId = this.familyId || this.userId; // Use family ID if available, otherwise user ID
             const docRef = doc(collection(db, 'mission'), familyId);
             const docSnap = await getDoc(docRef);
             
