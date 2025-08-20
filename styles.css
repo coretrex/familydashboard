@@ -1877,7 +1877,7 @@ input[type="range"]::-moz-range-thumb:hover {
     .section-header h2 {
         font-size: 1.2rem;
         margin: 0;
-        max-width: calc(100% - 120px);
+        max-width: calc(100% - 140px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1887,6 +1887,9 @@ input[type="range"]::-moz-range-thumb:hover {
         position: absolute;
         top: 0;
         right: 0;
+        font-size: 0.7rem;
+        padding: 4px 6px;
+        white-space: nowrap;
     }
     
     /* Family Mission */
@@ -2166,9 +2169,9 @@ input[type="range"]::-moz-range-thumb:hover {
     
     #birthday-input,
     #retirement-age-input {
-        width: 100%;
-        min-width: auto;
-        max-width: none;
+        width: 120px;
+        min-width: 120px;
+        max-width: 120px;
         padding: 6px 8px;
         font-size: 0.85rem;
     }
@@ -2234,7 +2237,7 @@ input[type="range"]::-moz-range-thumb:hover {
     
     .section-header h2 {
         font-size: 1.1rem;
-        max-width: calc(100% - 100px);
+        max-width: calc(100% - 120px);
     }
     
     .btn {
