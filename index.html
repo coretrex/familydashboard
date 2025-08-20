@@ -399,6 +399,9 @@
                     <button class="btn btn-secondary" onclick="reloadNetWorthData()">
                         <i class="fas fa-sync-alt"></i> Reload Net Worth Data
                     </button>
+                    <button class="btn btn-secondary" onclick="refreshUsersList()" style="margin-left: 10px;">
+                        <i class="fas fa-users"></i> Refresh Users List
+                    </button>
                 </div>
                 
                 <div class="modal-actions">
@@ -455,6 +458,35 @@
             </div>
         </div>
     </div>
+
+    <!-- Countdown Timer -->
+    <div id="countdown-timer" class="countdown-timer">
+        <div class="timer-header">
+            <span class="timer-title">Timer</span>
+            <button class="timer-close" onclick="hideTimer()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="timer-display">
+            <span id="timer-minutes">30</span>:<span id="timer-seconds">00</span>
+        </div>
+        <div class="timer-controls">
+            <button class="timer-btn timer-start" onclick="startTimer()">
+                <i class="fas fa-play"></i> Start
+            </button>
+            <button class="timer-btn timer-pause" onclick="pauseTimer()" style="display: none;">
+                <i class="fas fa-pause"></i> Pause
+            </button>
+            <button class="timer-btn timer-reset" onclick="resetTimer()">
+                <i class="fas fa-redo"></i> Reset
+            </button>
+        </div>
+    </div>
+
+    <!-- Timer Toggle Button -->
+    <button id="timer-toggle" class="timer-toggle-btn" onclick="toggleTimer()">
+        <i class="fas fa-clock"></i>
+    </button>
 
     <script src="script.js"></script>
 </body>

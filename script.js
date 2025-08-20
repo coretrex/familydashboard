@@ -187,7 +187,7 @@ window.loadDashboardTitle = function() {
 // Admin Panel System
 window.showAdminPanel = async function() {
     const modal = document.getElementById('admin-modal');
-    modal.style.display = 'block';
+    modal.classList.add('show');
     
     // Load current family members
     await loadFamilyMembers();
@@ -195,7 +195,7 @@ window.showAdminPanel = async function() {
 
 window.closeAdminPanel = function() {
     const modal = document.getElementById('admin-modal');
-    modal.style.display = 'none';
+    modal.classList.remove('show');
     
     // Clear form fields
     document.getElementById('admin-email').value = '';
@@ -248,6 +248,11 @@ window.addFamilyMember = async function() {
         document.getElementById('admin-role').value = 'member';
         
         await loadFamilyMembers();
+        
+        // Refresh users list to update assignee dropdowns
+        if (dashboard) {
+            await dashboard.loadUsers();
+        }
         
     } catch (error) {
         console.error('Error adding family member:', error);
@@ -307,6 +312,11 @@ window.removeFamilyMember = async function(memberId) {
         alert('Family member removed successfully!');
         await loadFamilyMembers();
         
+        // Refresh users list to update assignee dropdowns
+        if (dashboard) {
+            await dashboard.loadUsers();
+        }
+        
     } catch (error) {
         console.error('Error removing family member:', error);
         alert('Error removing family member. Please try again.');
@@ -352,6 +362,11 @@ window.toggleDiscussionComplete = async function(id) {
         const newCompletedStatus = !discussion.completed;
         await dashboard.updateItem('discussions', id, { completed: newCompletedStatus });
         
+        // Trigger confetti if discussion is being completed (not uncompleted)
+        if (newCompletedStatus) {
+            triggerConfetti();
+        }
+        
         // Re-render the discussions section
         renderSection('discussions');
         
@@ -364,7 +379,16 @@ window.toggleDiscussionComplete = async function(id) {
 // Update sprint status
 window.updateSprintStatus = async function(id, newStatus) {
     try {
+        // Check if this is a completion (for confetti)
+        const sprint = dashboard.getItems('sprints').find(item => item.id === id);
+        const isCompleting = sprint && sprint.status !== 'complete' && newStatus === 'complete';
+        
         await dashboard.updateItem('sprints', id, { status: newStatus });
+        
+        // Trigger confetti if sprint is being completed
+        if (isCompleting) {
+            triggerConfetti();
+        }
         
         // Re-render the sprints section
         renderSection('sprints');
@@ -713,15 +737,74 @@ class DashboardData {
 
     async loadUsers() {
         try {
-            const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-            const querySnapshot = await getDocs(collection(db, 'users'));
+            const { collection, getDocs, query, where } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
             this.users = [];
-            querySnapshot.forEach((doc) => {
+            
+            // Get the current user ID (use auth.currentUser.uid if available, otherwise this.userId)
+            const currentUserId = auth.currentUser?.uid || this.userId;
+            console.log('Loading users... Current userId:', currentUserId);
+            
+            // Load users from users collection
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            console.log('Users from users collection:', usersSnapshot.size);
+            usersSnapshot.forEach((doc) => {
                 this.users.push({ uid: doc.id, ...doc.data() });
             });
             
+            // Load family members from familyMembers collection
+            const familyMembersRef = collection(db, 'familyMembers');
+            const familyQuery = query(familyMembersRef, where('familyId', '==', currentUserId));
+            const familySnapshot = await getDocs(familyQuery);
+            
+            console.log('Family members found:', familySnapshot.size);
+            console.log('Looking for familyId:', currentUserId);
+            
+            // If no family members found with specific familyId, try loading all family members
+            if (familySnapshot.empty) {
+                console.log('No family members found with familyId, trying to load all family members...');
+                const allFamilyMembers = await getDocs(familyMembersRef);
+                console.log('Total family members in database:', allFamilyMembers.size);
+                
+                allFamilyMembers.forEach((doc) => {
+                    const member = doc.data();
+                    console.log('All family member data:', member);
+                    // Only add if not already in users list
+                    if (!this.users.find(u => u.email === member.email)) {
+                        this.users.push({
+                            uid: member.email, // Use email as uid for family members
+                            email: member.email,
+                            displayName: member.name || member.displayName,
+                            photoURL: member.photoURL,
+                            role: member.role,
+                            isFamilyMember: true
+                        });
+                        console.log('Added family member to users list:', member.name);
+                    }
+                });
+            } else {
+                familySnapshot.forEach((doc) => {
+                    const member = doc.data();
+                    console.log('Family member data:', member);
+                    // Only add if not already in users list
+                    if (!this.users.find(u => u.email === member.email)) {
+                        this.users.push({
+                            uid: member.email, // Use email as uid for family members
+                            email: member.email,
+                            displayName: member.name || member.displayName,
+                            photoURL: member.photoURL,
+                            role: member.role,
+                            isFamilyMember: true
+                        });
+                        console.log('Added family member to users list:', member.name);
+                    } else {
+                        console.log('Family member already in users list:', member.name);
+                    }
+                });
+            }
+            
             // Ensure current user is in the list
-            if (this.currentUser && !this.users.find(u => u.uid === this.currentUser.uid)) {
+            if (this.currentUser && !this.users.find(u => u.uid === this.currentUser.uid || u.email === this.currentUser.email)) {
                 this.users.push({
                     uid: this.currentUser.uid,
                     email: this.currentUser.email,
@@ -730,10 +813,11 @@ class DashboardData {
                 });
             }
             
-            console.log('Loaded users:', this.users);
+            console.log('Final users list:', this.users);
             
             // Update assignee dropdowns after loading users
             updateAssigneeDropdown();
+            refreshAllAssigneeDropdowns();
         } catch (error) {
             console.error('Error loading users:', error);
             this.users = [];
@@ -1669,8 +1753,11 @@ function createSprintHTML(item) {
     const assigneeName = assigneeUser ? (assigneeUser.displayName || assigneeUser.email) : item.assignee;
     const assigneePhoto = assigneeUser ? assigneeUser.photoURL : null;
     
+    // Add status-based CSS class
+    const statusClass = item.status ? `status-${item.status.replace(' ', '-')}` : '';
+    
     return `
-        <div class="sprint-item slide-in" data-id="${item.id}">
+        <div class="sprint-item slide-in ${statusClass}" data-id="${item.id}">
             <div class="sprint-line">
                 <span class="sprint-title" onclick="editSprintTitle('${item.id}')" style="cursor: pointer;">${escapeHtml(item.title)}</span>
                 <div class="sprint-assignee" onclick="editSprintAssignee('${item.id}')" style="cursor: pointer;">
@@ -1859,7 +1946,14 @@ async function toggleTodo(id) {
     const item = dashboard.getItems('todos').find(todo => todo.id === id);
     if (item) {
         try {
-            await dashboard.updateItem('todos', id, { completed: !item.completed });
+            const newCompletedStatus = !item.completed;
+            await dashboard.updateItem('todos', id, { completed: newCompletedStatus });
+            
+            // Trigger confetti if item is being completed (not uncompleted)
+            if (newCompletedStatus) {
+                triggerConfetti();
+            }
+            
             renderSection('todos');
         } catch (error) {
             console.error('Error updating todo:', error);
@@ -2544,23 +2638,24 @@ window.saveSprintTitle = async function(id, newTitle) {
     }
 };
 
-window.editSprintAssignee = function(id) {
+window.editSprintAssignee = async function(id) {
     const item = dashboard.getItems('sprints').find(sprint => sprint.id === id);
     if (!item) return;
     
     const assigneeElement = document.querySelector(`[data-id="${id}"] .sprint-assignee`);
     const currentAssignee = item.assignee;
     
-    // Create dropdown with current users
-    let options = '';
-    if (dashboard && dashboard.users) {
-        dashboard.users.forEach(user => {
-            const selected = (user.uid || user.id) === currentAssignee ? 'selected' : '';
-            options += `<option value="${user.uid || user.id}" ${selected}>${user.displayName || user.email}</option>`;
-        });
-    }
+    // Get all assignee options including family members
+    const options = await getAllAssigneeOptions();
     
-    assigneeElement.innerHTML = `<select style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.85rem;" onchange="saveSprintAssignee('${id}', this.value)" onblur="setTimeout(() => saveSprintAssignee('${id}', this.value), 150)">${options}</select>`;
+    // Create dropdown with all options
+    let optionsHtml = '';
+    options.forEach(user => {
+        const selected = (user.uid || user.id) === currentAssignee ? 'selected' : '';
+        optionsHtml += `<option value="${user.uid || user.id}" ${selected}>${user.displayName || user.email}</option>`;
+    });
+    
+    assigneeElement.innerHTML = `<select style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.85rem;" onchange="saveSprintAssignee('${id}', this.value)" onblur="setTimeout(() => saveSprintAssignee('${id}', this.value), 150)">${optionsHtml}</select>`;
     
     const select = assigneeElement.querySelector('select');
     select.focus();
@@ -2622,22 +2717,96 @@ window.saveSprintDate = async function(id, newDate) {
 };
 
 // Update assignee dropdown with loaded users
-function updateAssigneeDropdown() {
+async function updateAssigneeDropdown() {
     const assigneeSelect = document.getElementById('item-assignee');
-    if (!assigneeSelect || !dashboard || !dashboard.users) return;
+    if (!assigneeSelect) return;
+    
+    // Get all assignee options including family members
+    const options = await getAllAssigneeOptions();
     
     // Clear existing options
     assigneeSelect.innerHTML = '';
     
-    // Add user options (no "Both" option)
-    dashboard.users.forEach(user => {
+    // Add all options
+    options.forEach(user => {
         const option = document.createElement('option');
         option.value = user.uid || user.id;
         option.textContent = user.displayName || user.email || 'Unknown User';
         assigneeSelect.appendChild(option);
     });
     
-    console.log('Updated assignee dropdown with users:', dashboard.users);
+    console.log('Updated assignee dropdown with options:', options);
+}
+
+// Refresh all assignee dropdowns on the page
+async function refreshAllAssigneeDropdowns() {
+    // Get all assignee options including family members
+    const options = await getAllAssigneeOptions();
+    
+    // Update modal assignee dropdown
+    await updateAssigneeDropdown();
+    
+    // Update any open inline assignee dropdowns
+    const allAssigneeSelects = document.querySelectorAll('select[onchange*="saveSprintAssignee"], select[onchange*="saveTodoAssignee"], select[onchange*="saveDiscussionAssignee"], select[onchange*="saveGoalAssignee"]');
+    
+    allAssigneeSelects.forEach(select => {
+        const currentValue = select.value;
+        select.innerHTML = '';
+        
+        options.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.uid || user.id;
+            option.textContent = user.displayName || user.email || 'Unknown User';
+            if (option.value === currentValue) {
+                option.selected = true;
+            }
+            select.appendChild(option);
+        });
+    });
+    
+    console.log('Refreshed all assignee dropdowns with options:', options);
+}
+
+// Simple function to get all assignee options including family members
+async function getAllAssigneeOptions() {
+    const options = [];
+    
+    // Add current user
+    if (dashboard && dashboard.currentUser) {
+        options.push({
+            uid: dashboard.currentUser.uid,
+            email: dashboard.currentUser.email,
+            displayName: dashboard.currentUser.displayName || dashboard.currentUser.email,
+            photoURL: dashboard.currentUser.photoURL
+        });
+    }
+    
+    // Add family members directly from database
+    try {
+        const { collection, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        const familyMembersRef = collection(db, 'familyMembers');
+        const familySnapshot = await getDocs(familyMembersRef);
+        
+        familySnapshot.forEach((doc) => {
+            const member = doc.data();
+            // Only add if not already in options
+            if (!options.find(o => o.email === member.email)) {
+                options.push({
+                    uid: member.email, // Use email as uid for family members
+                    email: member.email,
+                    displayName: member.name || member.email,
+                    photoURL: member.photoURL,
+                    isFamilyMember: true
+                });
+            }
+        });
+        
+        console.log('Loaded assignee options:', options);
+    } catch (error) {
+        console.error('Error loading family members for assignee options:', error);
+    }
+    
+    return options;
 }
 
 
@@ -2990,3 +3159,253 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }, 2000);
 });
+
+// Countdown Timer Functionality
+let timerInterval = null;
+let timerRunning = false;
+let timerTimeLeft = 30 * 60; // 30 minutes in seconds
+let timerOriginalTime = 30 * 60; // Store original time for reset
+
+// Timer functions
+window.toggleTimer = function() {
+    const timer = document.getElementById('countdown-timer');
+    const toggleBtn = document.getElementById('timer-toggle');
+    
+    if (timer.style.display === 'block') {
+        hideTimer();
+    } else {
+        showTimer();
+    }
+};
+
+window.showTimer = function() {
+    const timer = document.getElementById('countdown-timer');
+    const toggleBtn = document.getElementById('timer-toggle');
+    
+    timer.style.display = 'block';
+    toggleBtn.style.display = 'none';
+};
+
+window.hideTimer = function() {
+    const timer = document.getElementById('countdown-timer');
+    const toggleBtn = document.getElementById('timer-toggle');
+    
+    timer.style.display = 'none';
+    toggleBtn.style.display = 'flex';
+};
+
+window.startTimer = function() {
+    if (timerRunning) return;
+    
+    timerRunning = true;
+    const startBtn = document.querySelector('.timer-start');
+    const pauseBtn = document.querySelector('.timer-pause');
+    
+    startBtn.style.display = 'none';
+    pauseBtn.style.display = 'flex';
+    
+    timerInterval = setInterval(() => {
+        timerTimeLeft--;
+        updateTimerDisplay();
+        
+        if (timerTimeLeft <= 0) {
+            stopTimer();
+            showTimerComplete();
+        }
+    }, 1000);
+};
+
+window.pauseTimer = function() {
+    if (!timerRunning) return;
+    
+    timerRunning = false;
+    const startBtn = document.querySelector('.timer-start');
+    const pauseBtn = document.querySelector('.timer-pause');
+    
+    startBtn.style.display = 'flex';
+    pauseBtn.style.display = 'none';
+    
+    clearInterval(timerInterval);
+};
+
+window.resetTimer = function() {
+    pauseTimer();
+    timerTimeLeft = timerOriginalTime;
+    updateTimerDisplay();
+    removeTimerWarnings();
+};
+
+window.updateTimerDisplay = function() {
+    const minutes = Math.floor(timerTimeLeft / 60);
+    const seconds = timerTimeLeft % 60;
+    
+    document.getElementById('timer-minutes').textContent = minutes.toString().padStart(2, '0');
+    document.getElementById('timer-seconds').textContent = seconds.toString().padStart(2, '0');
+    
+    // Add warning states
+    const timerDisplay = document.querySelector('.timer-display');
+    removeTimerWarnings();
+    
+    if (timerTimeLeft <= 300 && timerTimeLeft > 60) { // 5 minutes to 1 minute
+        timerDisplay.classList.add('warning');
+    } else if (timerTimeLeft <= 60) { // Last minute
+        timerDisplay.classList.add('danger');
+    }
+};
+
+window.removeTimerWarnings = function() {
+    const timerDisplay = document.querySelector('.timer-display');
+    timerDisplay.classList.remove('warning', 'danger');
+};
+
+window.stopTimer = function() {
+    timerRunning = false;
+    clearInterval(timerInterval);
+    
+    const startBtn = document.querySelector('.timer-start');
+    const pauseBtn = document.querySelector('.timer-pause');
+    
+    startBtn.style.display = 'flex';
+    pauseBtn.style.display = 'none';
+};
+
+window.showTimerComplete = function() {
+    // Create notification
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 1001;
+        font-family: 'Inter', sans-serif;
+        font-weight: 500;
+        animation: slideInRight 0.3s ease-out;
+    `;
+    notification.innerHTML = `
+        <i class="fas fa-check-circle" style="margin-right: 8px;"></i>
+        Timer completed!
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Play notification sound if supported
+    try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+        audio.play();
+    } catch (e) {
+        // Sound not supported, continue silently
+    }
+    
+    // Remove notification after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+        }
+    }, 5000);
+    
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes slideInRight {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+};
+
+// Initialize timer display on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateTimerDisplay();
+});
+
+// Confetti Animation Function
+function triggerConfetti() {
+    const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57', '#ff9ff3', '#54a0ff', '#5f27cd'];
+    const confettiCount = 150;
+    const confetti = [];
+    
+    // Create confetti container
+    const confettiContainer = document.createElement('div');
+    confettiContainer.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10000;
+        overflow: hidden;
+    `;
+    document.body.appendChild(confettiContainer);
+    
+    // Create confetti pieces
+    for (let i = 0; i < confettiCount; i++) {
+        const confettiPiece = document.createElement('div');
+        confettiPiece.style.cssText = `
+            position: absolute;
+            width: ${Math.random() * 10 + 5}px;
+            height: ${Math.random() * 10 + 5}px;
+            background: ${colors[Math.floor(Math.random() * colors.length)]};
+            left: ${Math.random() * 100}%;
+            top: -10px;
+            border-radius: ${Math.random() > 0.5 ? '50%' : '0'};
+            transform: rotate(${Math.random() * 360}deg);
+            animation: confettiFall ${Math.random() * 3 + 2}s linear forwards;
+        `;
+        
+        confettiContainer.appendChild(confettiPiece);
+        confetti.push(confettiPiece);
+    }
+    
+    // Add CSS animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-10px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+    `;
+    document.head.appendChild(style);
+    
+    // Remove confetti after animation
+    setTimeout(() => {
+        if (confettiContainer.parentNode) {
+            confettiContainer.parentNode.removeChild(confettiContainer);
+        }
+        if (style.parentNode) {
+            style.parentNode.removeChild(style);
+        }
+    }, 5000);
+}
+
+// Manual refresh function for debugging
+window.refreshUsersList = async function() {
+    console.log('Manual refresh of users list...');
+    if (dashboard) {
+        await dashboard.loadUsers();
+        refreshAllAssigneeDropdowns();
+        alert('Users list refreshed! Check console for details.');
+    } else {
+        alert('Dashboard not available');
+    }
+};
+
+
