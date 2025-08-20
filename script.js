@@ -30,8 +30,8 @@ window.saveMission = async function() {
     const textInput = document.getElementById('mission-text-input');
     
     // Update display elements with new values
-    titleElement.textContent = titleInput.value || 'Add Your Family Mission Here';
-    textElement.textContent = textInput.value || '';
+    titleElement.textContent = titleInput.value || 'Our Family Mission';
+    textElement.textContent = textInput.value || 'Add your mission here';
     
     // Hide edit form and show display elements
     titleElement.style.display = 'block';
@@ -111,13 +111,13 @@ window.loadMission = async function() {
     const textElement = document.getElementById('mission-text');
     
     if (titleElement && textElement) {
-        if (missionData && missionData.title && missionData.title !== 'Add Your Family Mission Here') {
-            titleElement.textContent = missionData.title;
-            textElement.textContent = missionData.text || '';
+        if (missionData && missionData.text && missionData.text !== 'Add your mission here') {
+            titleElement.textContent = missionData.title || 'Our Family Mission';
+            textElement.textContent = missionData.text;
         } else {
             // Show default state when no mission has been set
-            titleElement.textContent = 'Add Your Family Mission Here';
-            textElement.textContent = '';
+            titleElement.textContent = 'Our Family Mission';
+            textElement.textContent = 'Add your mission here';
         }
     }
 };
@@ -860,13 +860,13 @@ class DashboardData {
                     const textElement = document.getElementById('mission-text');
                     
                     if (titleElement && textElement) {
-                        if (missionData.title && missionData.title !== 'Add Your Family Mission Here') {
-                            titleElement.textContent = missionData.title;
-                            textElement.textContent = missionData.text || '';
+                        if (missionData.text && missionData.text !== 'Add your mission here') {
+                            titleElement.textContent = missionData.title || 'Our Family Mission';
+                            textElement.textContent = missionData.text;
                         } else {
                             // Show default state when no mission has been set
-                            titleElement.textContent = 'Add Your Family Mission Here';
-                            textElement.textContent = '';
+                            titleElement.textContent = 'Our Family Mission';
+                            textElement.textContent = 'Add your mission here';
                         }
                     }
                 }
