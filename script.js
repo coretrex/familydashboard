@@ -22,7 +22,7 @@ window.editMission = function() {
     titleInput.focus();
 };
 
-window.saveMission = function() {
+window.saveMission = async function() {
     const titleElement = document.getElementById('mission-title');
     const textElement = document.getElementById('mission-text');
     const editContainer = document.getElementById('mission-edit');
@@ -38,11 +38,22 @@ window.saveMission = function() {
     textElement.style.display = 'block';
     editContainer.style.display = 'none';
     
-    // Save to localStorage
-    localStorage.setItem('familyMission', JSON.stringify({
+    const missionData = {
         title: titleElement.textContent,
         text: textElement.textContent
-    }));
+    };
+    
+    // Save to localStorage
+    localStorage.setItem('familyMission', JSON.stringify(missionData));
+    
+    // Save to Firebase if user is authenticated
+    try {
+        if (dashboard && dashboard.userId) {
+            await dashboard.saveMissionData(missionData);
+        }
+    } catch (error) {
+        console.error('Error saving mission to Firebase:', error);
+    }
 };
 
 window.cancelMissionEdit = function() {
@@ -57,16 +68,34 @@ window.cancelMissionEdit = function() {
 };
 
 // Load saved mission on page load
-window.loadMission = function() {
-    const saved = localStorage.getItem('familyMission');
-    if (saved) {
-        const mission = JSON.parse(saved);
+window.loadMission = async function() {
+    let missionData = null;
+    
+    // Try to load from Firebase first if user is authenticated
+    try {
+        if (dashboard && dashboard.userId) {
+            missionData = await dashboard.loadMissionData();
+        }
+    } catch (error) {
+        console.error('Error loading mission from Firebase:', error);
+    }
+    
+    // Fallback to localStorage if no Firebase data
+    if (!missionData) {
+        const saved = localStorage.getItem('familyMission');
+        if (saved) {
+            missionData = JSON.parse(saved);
+        }
+    }
+    
+    // Update UI if we have data
+    if (missionData) {
         const titleElement = document.getElementById('mission-title');
         const textElement = document.getElementById('mission-text');
         
         if (titleElement && textElement) {
-            titleElement.textContent = mission.title;
-            textElement.textContent = mission.text;
+            titleElement.textContent = missionData.title;
+            textElement.textContent = missionData.text;
         }
     }
 };
@@ -997,6 +1026,52 @@ class DashboardData {
             }
         } catch (error) {
             console.error('Error loading net worth data from Firestore:', error);
+            throw error;
+        }
+    }
+
+    async saveMissionData(data) {
+        if (!this.userId) {
+            throw new Error('User not authenticated');
+        }
+        
+        try {
+            const { collection, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            // Save mission data to Firestore
+            await setDoc(doc(collection(db, 'mission'), this.userId), {
+                ...data,
+                userId: this.userId,
+                updatedAt: new Date().toISOString()
+            });
+            
+            console.log('Mission data saved to Firestore');
+        } catch (error) {
+            console.error('Error saving mission data to Firestore:', error);
+            throw error;
+        }
+    }
+
+    async loadMissionData() {
+        if (!this.userId) {
+            throw new Error('User not authenticated');
+        }
+        
+        try {
+            const { collection, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            const docRef = doc(collection(db, 'mission'), this.userId);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                console.log('Mission data loaded from Firestore');
+                return docSnap.data();
+            } else {
+                console.log('No mission data found in Firestore');
+                return null;
+            }
+        } catch (error) {
+            console.error('Error loading mission data from Firestore:', error);
             throw error;
         }
     }
@@ -2288,7 +2363,13 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(loadNetWorthData, 100);
         }
     }, 100);
-    setTimeout(loadMission, 100);
+    setTimeout(async () => {
+        try {
+            await loadMission();
+        } catch (error) {
+            console.error('Error loading mission:', error);
+        }
+    }, 100);
     setTimeout(loadDashboardTitle, 100);
     
     // Test if functions are accessible

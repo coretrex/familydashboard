@@ -1877,7 +1877,7 @@ input[type="range"]::-moz-range-thumb:hover {
     .section-header h2 {
         font-size: 1.2rem;
         margin: 0;
-        max-width: calc(100% - 140px);
+        max-width: 100%; /* Full width since button is hidden */
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1890,6 +1890,7 @@ input[type="range"]::-moz-range-thumb:hover {
         font-size: 0.7rem;
         padding: 4px 6px;
         white-space: nowrap;
+        display: none; /* Hide on mobile */
     }
     
     /* Family Mission */
@@ -2237,7 +2238,7 @@ input[type="range"]::-moz-range-thumb:hover {
     
     .section-header h2 {
         font-size: 1.1rem;
-        max-width: calc(100% - 120px);
+        max-width: 100%; /* Full width since button is hidden */
     }
     
     .btn {
