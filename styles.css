@@ -613,11 +613,12 @@ body {
     font-size: 1rem;
     font-weight: 600;
     color: #3b82f6;
-    flex: 0 0 150px;
+    flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding-right: 16px;
 }
 
 .sprint-assignee {

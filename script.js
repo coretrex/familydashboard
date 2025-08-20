@@ -1478,7 +1478,7 @@ function createGoodNewsHTML(item) {
 }
 
 function createSprintHTML(item) {
-    const date = item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No deadline';
+    const date = item.deadline ? new Date(item.deadline + 'T00:00:00').toLocaleDateString() : 'No deadline';
     const progressPercent = Math.min(item.progress || 0, 100);
     
     // Find assignee user information
@@ -1493,15 +1493,15 @@ function createSprintHTML(item) {
     return `
         <div class="sprint-item slide-in" data-id="${item.id}">
             <div class="sprint-line">
-                <span class="sprint-title">${escapeHtml(item.title)}</span>
-                <div class="sprint-assignee">
+                <span class="sprint-title" onclick="editSprintTitle('${item.id}')" style="cursor: pointer;">${escapeHtml(item.title)}</span>
+                <div class="sprint-assignee" onclick="editSprintAssignee('${item.id}')" style="cursor: pointer;">
                     ${assigneePhoto ? 
                         `<img src="${assigneePhoto}" alt="${assigneeName}" class="assignee-photo" />` : 
                         `<div class="assignee-photo-placeholder">${assigneeName.charAt(0).toUpperCase()}</div>`
                     }
                     <span class="assignee-name">${assigneeName}</span>
                 </div>
-                <span class="sprint-date">Due: ${date}</span>
+                <span class="sprint-date" onclick="editSprintDate('${item.id}')" style="cursor: pointer;">Due: ${date}</span>
             </div>
             <div class="sprint-actions">
                 <select class="sprint-status-dropdown" onchange="updateSprintStatus('${item.id}', this.value)">
@@ -1519,7 +1519,7 @@ function createSprintHTML(item) {
 }
 
 function createTodoHTML(item) {
-    const date = item.deadline ? new Date(item.deadline).toLocaleDateString() : 'No deadline';
+    const date = item.deadline ? new Date(item.deadline + 'T00:00:00').toLocaleDateString() : 'No deadline';
     const isCompleted = item.completed || false;
     
     // Find assignee user information
@@ -1559,7 +1559,7 @@ function createTodoHTML(item) {
 }
 
 function createGoalHTML(item) {
-    const date = item.targetDate ? new Date(item.targetDate).toLocaleDateString() : 'No target date';
+    const date = item.targetDate ? new Date(item.targetDate + 'T00:00:00').toLocaleDateString() : 'No target date';
     const progressPercent = Math.min(item.progress || 0, 100);
     const isCompleted = item.completed || false;
     
@@ -2308,6 +2308,81 @@ async function signOutUser() {
         alert('Error signing out. Please try again.');
     }
 }
+
+// Sprint editing functions
+window.editSprintTitle = function(id) {
+    const item = dashboard.getItems('sprints').find(sprint => sprint.id === id);
+    if (!item) return;
+    
+    const titleElement = document.querySelector(`[data-id="${id}"] .sprint-title`);
+    const currentTitle = item.title;
+    
+    titleElement.innerHTML = `<input type="text" value="${escapeHtml(currentTitle)}" style="width: 100%; padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 1rem;" onblur="saveSprintTitle('${id}', this.value)" onkeypress="if(event.key==='Enter') this.blur()">`;
+    titleElement.querySelector('input').focus();
+};
+
+window.saveSprintTitle = async function(id, newTitle) {
+    if (!newTitle.trim()) return;
+    
+    try {
+        await dashboard.updateItem('sprints', id, { title: newTitle.trim() });
+        renderSection('sprints');
+    } catch (error) {
+        console.error('Error updating sprint title:', error);
+        alert('Error updating sprint title. Please try again.');
+    }
+};
+
+window.editSprintAssignee = function(id) {
+    const item = dashboard.getItems('sprints').find(sprint => sprint.id === id);
+    if (!item) return;
+    
+    const assigneeElement = document.querySelector(`[data-id="${id}"] .sprint-assignee`);
+    const currentAssignee = item.assignee;
+    
+    // Create dropdown with current users
+    let options = '';
+    if (dashboard && dashboard.users) {
+        dashboard.users.forEach(user => {
+            const selected = (user.uid || user.id) === currentAssignee ? 'selected' : '';
+            options += `<option value="${user.uid || user.id}" ${selected}>${user.displayName || user.email}</option>`;
+        });
+    }
+    
+    assigneeElement.innerHTML = `<select style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.85rem;" onchange="saveSprintAssignee('${id}', this.value)">${options}</select>`;
+    assigneeElement.querySelector('select').focus();
+};
+
+window.saveSprintAssignee = async function(id, newAssignee) {
+    try {
+        await dashboard.updateItem('sprints', id, { assignee: newAssignee });
+        renderSection('sprints');
+    } catch (error) {
+        console.error('Error updating sprint assignee:', error);
+        alert('Error updating sprint assignee. Please try again.');
+    }
+};
+
+window.editSprintDate = function(id) {
+    const item = dashboard.getItems('sprints').find(sprint => sprint.id === id);
+    if (!item) return;
+    
+    const dateElement = document.querySelector(`[data-id="${id}"] .sprint-date`);
+    const currentDate = item.deadline || '';
+    
+    dateElement.innerHTML = `<input type="date" value="${currentDate}" style="padding: 4px; border: 1px solid #3b82f6; border-radius: 4px; font-size: 0.8rem;" onblur="saveSprintDate('${id}', this.value)" onchange="saveSprintDate('${id}', this.value)">`;
+    dateElement.querySelector('input').focus();
+};
+
+window.saveSprintDate = async function(id, newDate) {
+    try {
+        await dashboard.updateItem('sprints', id, { deadline: newDate });
+        renderSection('sprints');
+    } catch (error) {
+        console.error('Error updating sprint date:', error);
+        alert('Error updating sprint date. Please try again.');
+    }
+};
 
 // Update assignee dropdown with loaded users
 function updateAssigneeDropdown() {
