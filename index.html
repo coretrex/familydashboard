@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="format-detection" content="telephone=no">
     <title>Family Dashboard</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
@@ -87,8 +90,8 @@
             <section class="dashboard-section" id="family-mission">
                 <div class="section-content">
                     <div class="mission-container">
-                        <h1 class="mission-title" id="mission-title" onclick="editMission()">Our Family Mission</h1>
-                        <p class="mission-text" id="mission-text" onclick="editMission()">To build a legacy of financial freedom, meaningful relationships, and purposeful growth that empowers future generations to live their best lives.</p>
+                        <h1 class="mission-title" id="mission-title" onclick="editMission()">Add Your Family Mission Here</h1>
+                        <p class="mission-text" id="mission-text" onclick="editMission()"></p>
                         <div class="mission-edit" id="mission-edit" style="display: none;">
                             <input type="text" id="mission-title-input" class="mission-title-input" placeholder="Enter your family mission title">
                             <textarea id="mission-text-input" class="mission-text-input" placeholder="Enter your family mission statement"></textarea>

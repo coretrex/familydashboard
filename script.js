@@ -30,8 +30,8 @@ window.saveMission = async function() {
     const textInput = document.getElementById('mission-text-input');
     
     // Update display elements with new values
-    titleElement.textContent = titleInput.value || 'Our Family Mission';
-    textElement.textContent = textInput.value || 'To build a legacy of financial freedom, meaningful relationships, and purposeful growth that empowers future generations to live their best lives.';
+    titleElement.textContent = titleInput.value || 'Add Your Family Mission Here';
+    textElement.textContent = textInput.value || '';
     
     // Hide edit form and show display elements
     titleElement.style.display = 'block';
@@ -107,13 +107,17 @@ window.loadMission = async function() {
     }
     
     // Update UI if we have data
-    if (missionData) {
-        const titleElement = document.getElementById('mission-title');
-        const textElement = document.getElementById('mission-text');
-        
-        if (titleElement && textElement) {
+    const titleElement = document.getElementById('mission-title');
+    const textElement = document.getElementById('mission-text');
+    
+    if (titleElement && textElement) {
+        if (missionData && missionData.title && missionData.title !== 'Add Your Family Mission Here') {
             titleElement.textContent = missionData.title;
-            textElement.textContent = missionData.text;
+            textElement.textContent = missionData.text || '';
+        } else {
+            // Show default state when no mission has been set
+            titleElement.textContent = 'Add Your Family Mission Here';
+            textElement.textContent = '';
         }
     }
 };
@@ -856,8 +860,14 @@ class DashboardData {
                     const textElement = document.getElementById('mission-text');
                     
                     if (titleElement && textElement) {
-                        titleElement.textContent = missionData.title || 'Our Family Mission';
-                        textElement.textContent = missionData.text || 'To build a legacy of financial freedom, meaningful relationships, and purposeful growth that empowers future generations to live their best lives.';
+                        if (missionData.title && missionData.title !== 'Add Your Family Mission Here') {
+                            titleElement.textContent = missionData.title;
+                            textElement.textContent = missionData.text || '';
+                        } else {
+                            // Show default state when no mission has been set
+                            titleElement.textContent = 'Add Your Family Mission Here';
+                            textElement.textContent = '';
+                        }
                     }
                 }
             });
