@@ -216,6 +216,9 @@ window.sendInvite = async function() {
     }
     
     try {
+        // Import Firebase functions
+        const { addDoc, collection } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        
         // Create invitation in Firestore
         const invitation = {
             email: email,
@@ -282,6 +285,9 @@ window.checkUserInvitation = async function() {
 // Accept invitation
 window.acceptInvitation = async function(invitationId) {
     try {
+        // Import Firebase functions
+        const { doc, updateDoc, addDoc, collection } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        
         const invitationRef = doc(db, 'invitations', invitationId);
         await updateDoc(invitationRef, {
             status: 'accepted',
