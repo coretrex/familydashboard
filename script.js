@@ -954,6 +954,52 @@ class DashboardData {
     saveDataToLocalStorage() {
         localStorage.setItem('familyDashboardData', JSON.stringify(this.data));
     }
+
+    async saveNetWorthData(data) {
+        if (!this.userId) {
+            throw new Error('User not authenticated');
+        }
+        
+        try {
+            const { collection, doc, setDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            // Save net worth data to Firestore
+            await setDoc(doc(collection(db, 'netWorth'), this.userId), {
+                ...data,
+                userId: this.userId,
+                updatedAt: new Date().toISOString()
+            });
+            
+            console.log('Net worth data saved to Firestore');
+        } catch (error) {
+            console.error('Error saving net worth data to Firestore:', error);
+            throw error;
+        }
+    }
+
+    async loadNetWorthData() {
+        if (!this.userId) {
+            throw new Error('User not authenticated');
+        }
+        
+        try {
+            const { collection, doc, getDoc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+            
+            const docRef = doc(collection(db, 'netWorth'), this.userId);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+                console.log('Net worth data loaded from Firestore');
+                return docSnap.data();
+            } else {
+                console.log('No net worth data found in Firestore');
+                return null;
+            }
+        } catch (error) {
+            console.error('Error loading net worth data from Firestore:', error);
+            throw error;
+        }
+    }
 }
 
 // Initialize dashboard after Firebase is ready
@@ -2125,7 +2171,12 @@ function disableNetWorthEditing() {
     renderNetWorthBreakdown();
 }
 
-function saveNetWorthData() {
+async function saveNetWorthData() {
+    if (!dashboard || !dashboard.currentUser) {
+        console.log('Dashboard not ready or user not authenticated');
+        return;
+    }
+    
     const birthdayInput = document.getElementById('birthday-input');
     const retirementAgeInput = document.getElementById('retirement-age-input');
     
@@ -2135,53 +2186,108 @@ function saveNetWorthData() {
         monthlyInvestment: netWorthData.monthlyInvestment,
         annualReturnRate: netWorthData.annualReturnRate,
         birthday: birthdayInput ? birthdayInput.value : '1991-03-23',
-        retirementAge: retirementAgeInput ? parseInt(retirementAgeInput.value) : 60
+        retirementAge: retirementAgeInput ? parseInt(retirementAgeInput.value) : 60,
+        userId: dashboard.currentUser.uid,
+        updatedAt: new Date().toISOString()
     };
-    localStorage.setItem('netWorthData', JSON.stringify(data));
+    
+    try {
+        await dashboard.saveNetWorthData(data);
+        console.log('Net worth data saved to Firebase');
+    } catch (error) {
+        console.error('Error saving net worth data:', error);
+        // Fallback to localStorage
+        localStorage.setItem('netWorthData', JSON.stringify(data));
+    }
 }
 
-function loadNetWorthData() {
-    const saved = localStorage.getItem('netWorthData');
-    if (saved) {
-        const data = JSON.parse(saved);
-        netWorthData.assets = data.assets || [];
-        netWorthData.debts = data.debts || [];
-        netWorthData.monthlyInvestment = data.monthlyInvestment || 0;
-        netWorthData.annualReturnRate = data.annualReturnRate || 10;
-        
-        // Update slider and display
-        const slider = document.getElementById('monthly-investment-slider');
-        const valueDisplay = document.getElementById('monthly-investment-value');
-        if (slider && valueDisplay) {
-            slider.value = netWorthData.monthlyInvestment;
-            valueDisplay.textContent = formatCurrency(netWorthData.monthlyInvestment);
+async function loadNetWorthData() {
+    if (!dashboard || !dashboard.currentUser) {
+        console.log('Dashboard not ready or user not authenticated, loading from localStorage');
+        // Fallback to localStorage
+        const saved = localStorage.getItem('netWorthData');
+        if (saved) {
+            const data = JSON.parse(saved);
+            netWorthData.assets = data.assets || [];
+            netWorthData.debts = data.debts || [];
+            netWorthData.monthlyInvestment = data.monthlyInvestment || 0;
+            netWorthData.annualReturnRate = data.annualReturnRate || 10;
+            
+            updateNetWorthUI(data);
+            renderNetWorthBreakdown();
+            updateNetWorthCalculations();
         }
-        
-        // Update return rate input
-        const returnRateInput = document.getElementById('annual-return-rate');
-        if (returnRateInput) {
-            returnRateInput.value = netWorthData.annualReturnRate;
+        return;
+    }
+    
+    try {
+        const data = await dashboard.loadNetWorthData();
+        if (data) {
+            netWorthData.assets = data.assets || [];
+            netWorthData.debts = data.debts || [];
+            netWorthData.monthlyInvestment = data.monthlyInvestment || 0;
+            netWorthData.annualReturnRate = data.annualReturnRate || 10;
+            
+            updateNetWorthUI(data);
+            renderNetWorthBreakdown();
+            updateNetWorthCalculations();
+            console.log('Net worth data loaded from Firebase');
         }
-        
-        // Update birthday and retirement age inputs
-        const birthdayInput = document.getElementById('birthday-input');
-        const retirementAgeInput = document.getElementById('retirement-age-input');
-        if (birthdayInput) {
-            birthdayInput.value = data.birthday || '1991-03-23';
+    } catch (error) {
+        console.error('Error loading net worth data from Firebase:', error);
+        // Fallback to localStorage
+        const saved = localStorage.getItem('netWorthData');
+        if (saved) {
+            const data = JSON.parse(saved);
+            netWorthData.assets = data.assets || [];
+            netWorthData.debts = data.debts || [];
+            netWorthData.monthlyInvestment = data.monthlyInvestment || 0;
+            netWorthData.annualReturnRate = data.annualReturnRate || 10;
+            
+            updateNetWorthUI(data);
+            renderNetWorthBreakdown();
+            updateNetWorthCalculations();
         }
-        if (retirementAgeInput) {
-            retirementAgeInput.value = data.retirementAge || 60;
-        }
-        
-        renderNetWorthBreakdown();
-        updateNetWorthCalculations();
+    }
+}
+
+function updateNetWorthUI(data) {
+    // Update slider and display
+    const slider = document.getElementById('monthly-investment-slider');
+    const valueDisplay = document.getElementById('monthly-investment-value');
+    if (slider && valueDisplay) {
+        slider.value = netWorthData.monthlyInvestment;
+        valueDisplay.textContent = formatCurrency(netWorthData.monthlyInvestment);
+    }
+    
+    // Update return rate input
+    const returnRateInput = document.getElementById('annual-return-rate');
+    if (returnRateInput) {
+        returnRateInput.value = netWorthData.annualReturnRate;
+    }
+    
+    // Update birthday and retirement age inputs
+    const birthdayInput = document.getElementById('birthday-input');
+    const retirementAgeInput = document.getElementById('retirement-age-input');
+    if (birthdayInput) {
+        birthdayInput.value = data.birthday || '1991-03-23';
+    }
+    if (retirementAgeInput) {
+        retirementAgeInput.value = data.retirementAge || 60;
     }
 }
 
 // Initialize net worth calculations when page loads
 document.addEventListener('DOMContentLoaded', function() {
     // Load saved data after a short delay to ensure elements exist
-    setTimeout(loadNetWorthData, 100);
+    setTimeout(async () => {
+        if (dashboard && dashboard.initialized) {
+            await loadNetWorthData();
+        } else {
+            // Fallback to localStorage if dashboard not ready
+            setTimeout(loadNetWorthData, 100);
+        }
+    }, 100);
     setTimeout(loadMission, 100);
     setTimeout(loadDashboardTitle, 100);
     
